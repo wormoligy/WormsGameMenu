@@ -1,1 +1,88 @@
+// ==UserScript==
+// @name         Fullscreen Menu (Ctrl+P)
+// @namespace    http://tampermonkey.net/
+// @version      1.0
+// @description  Opens a fullscreen overlay menu when Ctrl+P is pressed
+// @match        *://*/*
+// @grant        none
+// ==/UserScript==
 
+(function() {
+    'use strict';
+
+    // ---------- 1. Create the menu element ----------
+    const overlay = document.createElement('div');
+    overlay.id = 'tm-fullscreen-menu';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.9)';
+    overlay.style.color = 'white';
+    overlay.style.display = 'none';
+    overlay.style.zIndex = '999999';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.flexDirection = 'column';
+    overlay.style.fontSize = '2rem';
+    overlay.style.transition = 'opacity 0.3s ease';
+    overlay.style.opacity = '0';
+    overlay.style.backdropFilter = 'blur(6px)';
+    overlay.style.fontFamily = 'Arial, sans-serif';
+    overlay.style.cursor = 'default';
+    overlay.style.userSelect = 'none';
+    overlay.style.padding = '20px';
+    overlay.innerHTML = `
+        <div style="text-align:center;">
+            <h1 style="margin-bottom:20px;">📜 Custom Menu</h1>
+            <p>Press <b>Ctrl + P</b> again to close.</p>
+            <button id="tm-close-btn" style="
+                margin-top:30px;
+                padding:10px 20px;
+                font-size:1.2rem;
+                cursor:pointer;
+                border:none;
+                border-radius:8px;
+                background:#ff4444;
+                color:white;
+                transition: background 0.2s ease;
+            ">Close Menu</button>
+        </div>
+    `;
+    overlay.style.display = 'flex';
+    overlay.style.visibility = 'hidden';
+
+    document.body.appendChild(overlay);
+
+    // ---------- 2. Toggle function ----------
+    function toggleMenu() {
+        const isVisible = overlay.style.visibility === 'visible';
+        if (isVisible) {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.style.visibility = 'hidden';
+                overlay.style.display = 'none';
+            }, 300);
+        } else {
+            overlay.style.display = 'flex';
+            setTimeout(() => {
+                overlay.style.visibility = 'visible';
+                overlay.style.opacity = '1';
+            }, 10);
+        }
+    }
+
+    // ---------- 3. Listen for Ctrl+P ----------
+    window.addEventListener('keydown', function(e) {
+        // Check for Ctrl+P but ignore the browser print shortcut
+        if (e.ctrlKey && e.key.toLowerCase() === 'p') {
+            e.preventDefault(); // stop print dialog
+            toggleMenu();
+        }
+    });
+
+    // ---------- 4. Close button ----------
+    overlay.querySelector('#tm-close-btn').addEventListener('click', toggleMenu);
+
+})();
