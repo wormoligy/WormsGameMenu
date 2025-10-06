@@ -1,87 +1,153 @@
 // ==UserScript==
-// @name         Fullscreen Menu (Ctrl+M)
+// @name         Fullscreen Menu (Ctrl+M) - Robust
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Opens a fullscreen overlay menu when Ctrl+M is pressed
+// @version      1.3
+// @description  Toggle a fullscreen overlay when Ctrl+M (or Cmd+M) is pressed. Improved capture, debug logs, Escape to close.
 // @match        *://*/*
+// @run-at       document-end
 // @grant        none
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+  'use strict';
 
-    // ---------- 1. Create the menu element ----------
-    const overlay = document.createElement('div');
-    overlay.id = 'tm-fullscreen-menu';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.backgroundColor = 'rgba(0,0,0,0.9)';
-    overlay.style.color = 'white';
-    overlay.style.display = 'none';
-    overlay.style.zIndex = '999999';
-    overlay.style.justifyContent = 'center';
-    overlay.style.alignItems = 'center';
-    overlay.style.flexDirection = 'column';
-    overlay.style.fontSize = '2rem';
-    overlay.style.transition = 'opacity 0.3s ease';
-    overlay.style.opacity = '0';
-    overlay.style.backdropFilter = 'blur(6px)';
-    overlay.style.fontFamily = 'Arial, sans-serif';
-    overlay.style.cursor = 'default';
-    overlay.style.userSelect = 'none';
-    overlay.style.padding = '20px';
-    overlay.innerHTML = `
-        <div style="text-align:center;">
-            <h1 style="margin-bottom:20px;">📜 Custom Menu</h1>
-            <p>Press <b>Ctrl + M</b> again to close.</p>
-            <button id="tm-close-btn" style="
-                margin-top:30px;
-                padding:10px 20px;
-                font-size:1.2rem;
-                cursor:pointer;
-                border:none;
-                border-radius:8px;
-                background:#ff4444;
-                color:white;
-                transition: background 0.2s ease;
-            ">Close Menu</button>
-        </div>
-    `;
-    overlay.style.display = 'flex';
-    overlay.style.visibility = 'hidden';
+  // Only run in top frame to avoid duplicate overlays inside iframes.
+  if (window.top !== window) return;
 
-    document.body.appendChild(overlay);
+  console.log('[TM-FM] script loaded');
 
-    // ---------- 2. Toggle function ----------
-    function toggleMenu() {
-        const isVisible = overlay.style.visibility === 'visible';
-        if (isVisible) {
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.style.visibility = 'hidden';
-                overlay.style.display = 'none';
-            }, 300);
-        } else {
-            overlay.style.display = 'flex';
-            setTimeout(() => {
-                overlay.style.visibility = 'visible';
-                overlay.style.opacity = '1';
-            }, 10);
-        }
+  // Unique IDs to avoid collisions with page CSS/JS
+  const OVERLAY_ID = 'tm-fullscreen-menu-v1';
+  const STYLE_ID = 'tm-fullscreen-menu-style-v1';
+
+  // If overlay already exists (e.g., re-run), remove it first
+  const existing = document.getElementById(OVERLAY_ID);
+  if (existing) existing.remove();
+  const existingStyle = document.getElementById(STYLE_ID);
+  if (existingStyle) existingStyle.remove();
+
+  // ---------- Styles ----------
+  const css = `
+    #${OVERLAY_ID} {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0,0,0,0.88) !important;
+      color: #fff !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 2147483647 !important; /* top of almost everything */
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial !important;
+      -webkit-user-select: none !important;
+      user-select: none !important;
+      transition: opacity 200ms ease !important;
+      opacity: 1 !important;
+      box-sizing: border-box !important;
+      padding: 24px !important;
     }
+    #${OVERLAY_ID} .tm-panel {
+      max-width: 1000px !important;
+      width: 90% !important;
+      max-height: 90% !important;
+      overflow: auto !important;
+      text-align: center !important;
+    }
+    #${OVERLAY_ID} button.tm-close {
+      cursor: pointer !important;
+      padding: 10px 18px !important;
+      border-radius: 8px !important;
+      border: none !important;
+      font-size: 16px !important;
+      background: #ff5a5f !important;
+      color: white !important;
+    }
+    /* allow clicking overlay background to close */
+    #${OVERLAY_ID}.hidden { display: none !important; opacity: 0 !important; }
+  `;
+  const styleEl = document.createElement('style');
+  styleEl.id = STYLE_ID;
+  styleEl.textContent = css;
+  document.head.appendChild(styleEl);
 
-    // ---------- 3. Listen for Ctrl+M ----------
-    window.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key.toLowerCase() === 'm') {
-            e.preventDefault(); // prevent browser shortcuts that may exist
-            toggleMenu();
+  // ---------- Overlay ---------- 
+  const overlay = document.createElement('div');
+  overlay.id = OVERLAY_ID;
+  overlay.className = 'hidden';
+  overlay.innerHTML = `
+    <div class="tm-panel" role="dialog" aria-modal="true">
+      <h1 style="margin:0 0 12px 0;">📜 Custom Fullscreen Menu</h1>
+      <p style="margin:0 0 18px 0;">Press <strong>Ctrl/Cmd + M</strong> to toggle. Press <strong>Esc</strong> to close.</p>
+      <div style="margin-top:18px;">
+        <button class="tm-close">Close Menu</button>
+      </div>
+    </div>
+  `;
+  // clicking background (not the panel) closes
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) toggleMenu();
+  });
+
+  // close button
+  overlay.querySelector('button.tm-close').addEventListener('click', toggleMenu);
+
+  // Add to DOM (use documentElement if body not present)
+  (document.body || document.documentElement).appendChild(overlay);
+
+  let open = false;
+  function show() {
+    overlay.classList.remove('hidden');
+    open = true;
+    console.log('[TM-FM] menu opened');
+  }
+  function hide() {
+    overlay.classList.add('hidden');
+    open = false;
+    console.log('[TM-FM] menu closed');
+  }
+  function toggleMenu() {
+    if (open) hide(); else show();
+  }
+
+  // ---------- Key handling ----------
+  function isModifierPressed(e) {
+    // Ctrl on Windows/Linux, Meta (Cmd) on macOS
+    return e.ctrlKey || e.metaKey;
+  }
+
+  function handleKeyDown(e) {
+    try {
+      // If Escape and menu open -> close
+      if (e.key === 'Escape' || e.key === 'Esc') {
+        if (open) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          hide();
         }
-    });
+        return;
+      }
 
-    // ---------- 4. Close button ----------
-    overlay.querySelector('#tm-close-btn').addEventListener('click', toggleMenu);
+      // check for Ctrl/Cmd + M
+      if (isModifierPressed(e) && (e.key && e.key.toLowerCase() === 'm' || e.code === 'KeyM')) {
+        // Prevent browser/website default and intercept other handlers
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        toggleMenu();
+      }
+    } catch (err) {
+      // don't break the page
+      console.error('[TM-FM] key handler error', err);
+    }
+  }
 
+  // Use capture-phase true to intercept before many site handlers
+  window.addEventListener('keydown', handleKeyDown, true);
+
+  // Expose a small API for debugging from DevTools
+  window.__tm_fullscreen_menu = {
+    show, hide, toggle: toggleMenu, isOpen: () => open
+  };
+
+  console.log('[TM-FM] ready. Press Ctrl/Cmd+M to toggle the menu.');
 })();
