@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Fullscreen Menu (Ctrl+P)
+// @name         Fullscreen Menu (Ctrl+O)
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Opens a fullscreen overlay menu when Ctrl+P is pressed
+// @version      1.1
+// @description  Opens a fullscreen overlay menu when Ctrl+O is pressed
 // @match        *://*/*
 // @grant        none
 // ==/UserScript==
@@ -36,7 +36,7 @@
     overlay.innerHTML = `
         <div style="text-align:center;">
             <h1 style="margin-bottom:20px;">📜 Custom Menu</h1>
-            <p>Press <b>Ctrl + P</b> again to close.</p>
+            <p>Press <b>Ctrl + O</b> again to close.</p>
             <button id="tm-close-btn" style="
                 margin-top:30px;
                 padding:10px 20px;
@@ -73,11 +73,11 @@
         }
     }
 
-    // ---------- 3. Listen for Ctrl+P ----------
+    // ---------- 3. Listen for Ctrl+O ----------
     window.addEventListener('keydown', function(e) {
-        // Check for Ctrl+P but ignore the browser print shortcut
-        if (e.ctrlKey && e.key.toLowerCase() === 'p') {
-            e.preventDefault(); // stop print dialog
+        // Check for Ctrl+O and override default browser "Open file" dialog
+        if (e.ctrlKey && e.key.toLowerCase() === 'o') {
+            e.preventDefault();
             toggleMenu();
         }
     });
