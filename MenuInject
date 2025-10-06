@@ -1,153 +1,113 @@
 // ==UserScript==
-// @name         Fullscreen Menu (Ctrl+M) - Robust
+// @name         Mini FPS Sprite Game
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Toggle a fullscreen overlay when Ctrl+M (or Cmd+M) is pressed. Improved capture, debug logs, Escape to close.
+// @version      1.0
+// @description  Basic FPS-like sprite overlay with GitHub image
 // @match        *://*/*
-// @run-at       document-end
 // @grant        none
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  // Only run in top frame to avoid duplicate overlays inside iframes.
-  if (window.top !== window) return;
+  const SPRITE_URL = "https://raw.githubusercontent.com/wormoligy/WormsGameMenu/main/pixil-frame-0.png";
 
-  console.log('[TM-FM] script loaded');
-
-  // Unique IDs to avoid collisions with page CSS/JS
-  const OVERLAY_ID = 'tm-fullscreen-menu-v1';
-  const STYLE_ID = 'tm-fullscreen-menu-style-v1';
-
-  // If overlay already exists (e.g., re-run), remove it first
-  const existing = document.getElementById(OVERLAY_ID);
-  if (existing) existing.remove();
-  const existingStyle = document.getElementById(STYLE_ID);
-  if (existingStyle) existingStyle.remove();
-
-  // ---------- Styles ----------
-  const css = `
-    #${OVERLAY_ID} {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      background: rgba(0,0,0,0.88) !important;
-      color: #fff !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      z-index: 2147483647 !important; /* top of almost everything */
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial !important;
-      -webkit-user-select: none !important;
-      user-select: none !important;
-      transition: opacity 200ms ease !important;
-      opacity: 1 !important;
-      box-sizing: border-box !important;
-      padding: 24px !important;
-    }
-    #${OVERLAY_ID} .tm-panel {
-      max-width: 1000px !important;
-      width: 90% !important;
-      max-height: 90% !important;
-      overflow: auto !important;
-      text-align: center !important;
-    }
-    #${OVERLAY_ID} button.tm-close {
-      cursor: pointer !important;
-      padding: 10px 18px !important;
-      border-radius: 8px !important;
-      border: none !important;
-      font-size: 16px !important;
-      background: #ff5a5f !important;
-      color: white !important;
-    }
-    /* allow clicking overlay background to close */
-    #${OVERLAY_ID}.hidden { display: none !important; opacity: 0 !important; }
-  `;
-  const styleEl = document.createElement('style');
-  styleEl.id = STYLE_ID;
-  styleEl.textContent = css;
-  document.head.appendChild(styleEl);
-
-  // ---------- Overlay ---------- 
+  // Create overlay
   const overlay = document.createElement('div');
-  overlay.id = OVERLAY_ID;
-  overlay.className = 'hidden';
-  overlay.innerHTML = `
-    <div class="tm-panel" role="dialog" aria-modal="true">
-      <h1 style="margin:0 0 12px 0;">📜 Custom Fullscreen Menu</h1>
-      <p style="margin:0 0 18px 0;">Press <strong>Ctrl/Cmd + M</strong> to toggle. Press <strong>Esc</strong> to close.</p>
-      <div style="margin-top:18px;">
-        <button class="tm-close">Close Menu</button>
-      </div>
-    </div>
-  `;
-  // clicking background (not the panel) closes
-  overlay.addEventListener('click', (ev) => {
-    if (ev.target === overlay) toggleMenu();
+  overlay.style.position = 'fixed';
+  overlay.style.top = 0;
+  overlay.style.left = 0;
+  overlay.style.width = '100vw';
+  overlay.style.height = '100vh';
+  overlay.style.background = '#222';
+  overlay.style.zIndex = '999999';
+  overlay.style.display = 'none';
+  overlay.style.overflow = 'hidden';
+  document.body.appendChild(overlay);
+
+  // Add player sprite
+  const player = document.createElement('img');
+  player.src = SPRITE_URL;
+  player.style.position = 'absolute';
+  player.style.width = '64px';
+  player.style.height = '64px';
+  player.style.transformOrigin = 'center center';
+  overlay.appendChild(player);
+
+  // Initial position and rotation
+  let x = window.innerWidth / 2;
+  let y = window.innerHeight / 2;
+  let angle = 0;
+  const speed = 10;
+
+  function updatePosition() {
+    player.style.left = `${x}px`;
+    player.style.top = `${y}px`;
+    player.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+  }
+  updatePosition();
+
+  // Listen for keys
+  window.addEventListener('keydown', (e) => {
+    // Toggle overlay
+    if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+      overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
+
+    if (overlay.style.display === 'none') return; // ignore if game is closed
+
+    switch (e.key.toLowerCase()) {
+      case 'w':
+        // Move forward in facing direction
+        x += Math.cos(angle * Math.PI / 180) * speed;
+        y += Math.sin(angle * Math.PI / 180) * speed;
+        break;
+      case 'a':
+        // Turn left
+        angle -= 10;
+        break;
+      case 'd':
+        // Turn right
+        angle += 10;
+        break;
+      case ' ':
+        shoot();
+        break;
+    }
+    updatePosition();
   });
 
-  // close button
-  overlay.querySelector('button.tm-close').addEventListener('click', toggleMenu);
+  // Basic shooting effect
+  function shoot() {
+    const bullet = document.createElement('div');
+    bullet.style.position = 'absolute';
+    bullet.style.width = '10px';
+    bullet.style.height = '10px';
+    bullet.style.background = 'red';
+    bullet.style.borderRadius = '50%';
+    bullet.style.left = `${x}px`;
+    bullet.style.top = `${y}px`;
+    bullet.style.transform = 'translate(-50%, -50%)';
+    overlay.appendChild(bullet);
 
-  // Add to DOM (use documentElement if body not present)
-  (document.body || document.documentElement).appendChild(overlay);
+    let dist = 0;
+    const bulletSpeed = 20;
+    const interval = setInterval(() => {
+      dist += bulletSpeed;
+      bullet.style.left = `${x + Math.cos(angle * Math.PI / 180) * dist}px`;
+      bullet.style.top = `${y + Math.sin(angle * Math.PI / 180) * dist}px`;
 
-  let open = false;
-  function show() {
-    overlay.classList.remove('hidden');
-    open = true;
-    console.log('[TM-FM] menu opened');
-  }
-  function hide() {
-    overlay.classList.add('hidden');
-    open = false;
-    console.log('[TM-FM] menu closed');
-  }
-  function toggleMenu() {
-    if (open) hide(); else show();
-  }
-
-  // ---------- Key handling ----------
-  function isModifierPressed(e) {
-    // Ctrl on Windows/Linux, Meta (Cmd) on macOS
-    return e.ctrlKey || e.metaKey;
-  }
-
-  function handleKeyDown(e) {
-    try {
-      // If Escape and menu open -> close
-      if (e.key === 'Escape' || e.key === 'Esc') {
-        if (open) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          hide();
-        }
-        return;
+      // Remove if off screen
+      if (
+        parseInt(bullet.style.left) < 0 ||
+        parseInt(bullet.style.top) < 0 ||
+        parseInt(bullet.style.left) > window.innerWidth ||
+        parseInt(bullet.style.top) > window.innerHeight
+      ) {
+        clearInterval(interval);
+        bullet.remove();
       }
-
-      // check for Ctrl/Cmd + M
-      if (isModifierPressed(e) && (e.key && e.key.toLowerCase() === 'm' || e.code === 'KeyM')) {
-        // Prevent browser/website default and intercept other handlers
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        toggleMenu();
-      }
-    } catch (err) {
-      // don't break the page
-      console.error('[TM-FM] key handler error', err);
-    }
+    }, 30);
   }
-
-  // Use capture-phase true to intercept before many site handlers
-  window.addEventListener('keydown', handleKeyDown, true);
-
-  // Expose a small API for debugging from DevTools
-  window.__tm_fullscreen_menu = {
-    show, hide, toggle: toggleMenu, isOpen: () => open
-  };
-
-  console.log('[TM-FM] ready. Press Ctrl/Cmd+M to toggle the menu.');
 })();
